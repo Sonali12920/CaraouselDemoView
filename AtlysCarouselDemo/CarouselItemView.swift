@@ -76,12 +76,18 @@ struct CarouselItemView: View {
     }
     
     private func getSideImageCornerRadius() -> AnyShape {
-        if index < activeIndex {
-            // Left image - only right corners rounded
-            return AnyShape(RoundedCorner(radius: CarouselConfiguration.cornerRadius, corners: [.topRight, .bottomRight]))
+        // When spacing is 0, images are touching, so corners where they meet should be flat
+        if CarouselConfiguration.spacing == 0 {
+            if index < activeIndex {
+                // Left image - only left corners rounded (right corners are flat where it touches center)
+                return AnyShape(RoundedCorner(radius: CarouselConfiguration.cornerRadius, corners: [.topLeft, .bottomLeft]))
+            } else {
+                // Right image - only right corners rounded (left corners are flat where it touches center)
+                return AnyShape(RoundedCorner(radius: CarouselConfiguration.cornerRadius, corners: [.topRight, .bottomRight]))
+            }
         } else {
-            // Right image - only left corners rounded
-            return AnyShape(RoundedCorner(radius: CarouselConfiguration.cornerRadius, corners: [.topLeft, .bottomLeft]))
+            // When there's spacing, all corners can be rounded
+            return AnyShape(RoundedRectangle(cornerRadius: CarouselConfiguration.cornerRadius))
         }
     }
 }
