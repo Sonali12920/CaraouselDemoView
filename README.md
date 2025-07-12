@@ -97,3 +97,8 @@ Built with ❤️ using SwiftUI
 
 <img width="503" height="954" alt="Screenshot 2025-07-12 at 9 20 02 PM" src="https://github.com/user-attachments/assets/be739936-22e1-4241-be19-cbd311ce57cf" />
 
+
+
+https://github.com/user-attachments/assets/66387496-8384-45ce-a486-600c85ba842c
+
+
