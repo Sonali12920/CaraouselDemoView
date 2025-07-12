@@ -11,9 +11,10 @@ struct CarouselView: View {
     @StateObject private var viewModel = CarouselViewModel()
     @State private var activeIndex: Int = 0
     @State private var dragOffset: CGFloat = 0
+    @State private var currentPage: Int = 0
     
     // Layout constants
-    private let spacing: CGFloat = 20
+    private let spacing: CGFloat = 0
     private let cardAspectRatio: CGFloat = 1.0
     private let centerCardScale: CGFloat = 1.2
     private let sideCardScale: CGFloat = 0.8
@@ -21,51 +22,71 @@ struct CarouselView: View {
     private let cardPadding: CGFloat = 40 // Space on sides when card is centered
     
     var body: some View {
-        GeometryReader { geometry in
-            let cardWidth = geometry.size.width - (cardPadding * 2)
-            let cardHeight = cardWidth * cardAspectRatio
-            let totalCardWidth = cardWidth + spacing
-            
-            ZStack {
-                // Background for visible area
-                Color.clear
-                    .frame(width: geometry.size.width, height: cardHeight)
+        VStack(spacing: 16) {
+            GeometryReader { geometry in
+                let cardWidth = geometry.size.width - (cardPadding * 2)
+                let cardHeight = cardWidth * cardAspectRatio
+                let imageWidth = cardWidth * 0.9
+                let totalCardWidth = imageWidth
                 
-                // Carousel items with circular scrolling
-                HStack(spacing: spacing) {
-                    ForEach(0..<viewModel.items.count * 3, id: \.self) { index in
-                        let actualIndex = index % viewModel.items.count
-                        let item = viewModel.items[actualIndex]
+                ZStack {
+                    // Background for visible area
+                    Color.clear
+                        .frame(width: geometry.size.width, height: cardHeight)
+                    
+                                    // Carousel items
+                HStack(spacing: 0) {
+                    ForEach(0..<viewModel.items.count, id: \.self) { index in
+                        let item = viewModel.items[index]
                         
                         CarouselItemView(
                             item: item,
                             isActive: isItemActive(index: index),
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight
+                            cardWidth: imageWidth,
+                            cardHeight: cardHeight,
+                            index: index,
+                            activeIndex: activeIndex
                         )
                         .scaleEffect(getScaleForIndex(index: index))
                         .opacity(getOpacityForIndex(index: index))
                     }
                 }
-                .offset(x: calculateOffset(geometry: geometry, totalCardWidth: totalCardWidth))
-                .frame(width: geometry.size.width, alignment: .leading)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            dragOffset = value.translation.width
-                        }
-                        .onEnded { value in
-                            handleDragEnd(value: value, cardWidth: cardWidth, totalCardWidth: totalCardWidth)
-                        }
-                )
+                    .offset(x: calculateOffset(geometry: geometry, totalCardWidth: totalCardWidth))
+                    .frame(width: geometry.size.width, alignment: .leading)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                dragOffset = value.translation.width
+                            }
+                            .onEnded { value in
+                                handleDragEnd(value: value, cardWidth: cardWidth, totalCardWidth: totalCardWidth)
+                            }
+                    )
+                }
+                .frame(height: cardHeight)
             }
-            .frame(height: cardHeight)
+            .frame(height: 280)
+            
+            // Pagination dots
+            HStack(spacing: 8) {
+                ForEach(0..<viewModel.items.count, id: \.self) { index in
+                    Circle()
+                        .fill(currentPage == index ? Color.purple : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(currentPage == index ? 1.2 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                navigateToPage(index)
+                            }
+                        }
+                }
+            }
         }
-        .frame(height: 280) // Increased height for better visibility
         .padding(.horizontal, 8)
         .onAppear {
-            // Start at the middle set of items for circular scrolling
-            activeIndex = viewModel.items.count
+            activeIndex = 0
+            currentPage = 0
         }
     }
     
@@ -98,8 +119,8 @@ struct CarouselView: View {
     private func calculateOffset(geometry: GeometryProxy, totalCardWidth: CGFloat) -> CGFloat {
         let centerOffset = CGFloat(activeIndex) * -totalCardWidth
         let screenCenter = geometry.size.width / 2
-        let cardCenter = (geometry.size.width - cardPadding * 2) / 2
-        let adjustment = screenCenter - cardCenter
+        let imageCenter = totalCardWidth / 2
+        let adjustment = screenCenter - imageCenter
         return centerOffset + adjustment + dragOffset
     }
     
@@ -109,21 +130,26 @@ struct CarouselView: View {
         
         withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8)) {
             if value.translation.width < -dragThreshold || predictedEnd < -cardWidth {
-                activeIndex += 1
-                // Handle circular scrolling
-                if activeIndex >= viewModel.items.count * 2 {
-                    activeIndex = viewModel.items.count
-                }
+                activeIndex = min(activeIndex + 1, viewModel.items.count - 1)
             } else if value.translation.width > dragThreshold || predictedEnd > cardWidth {
-                activeIndex -= 1
-                // Handle circular scrolling
-                if activeIndex < viewModel.items.count {
-                    activeIndex = viewModel.items.count * 2 - 1
-                }
+                activeIndex = max(activeIndex - 1, 0)
             }
             dragOffset = 0
         }
+        
+        // Update current page
+        updateCurrentPage()
         impactFeedback(style: .light)
+    }
+    
+    private func navigateToPage(_ page: Int) {
+        activeIndex = page
+        currentPage = page
+        impactFeedback(style: .light)
+    }
+    
+    private func updateCurrentPage() {
+        currentPage = activeIndex
     }
     
     private func impactFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle) {
@@ -137,33 +163,73 @@ struct CarouselItemView: View {
     let isActive: Bool
     let cardWidth: CGFloat
     let cardHeight: CGFloat
+    let index: Int
+    let activeIndex: Int
     
     var body: some View {
-        VStack(spacing: 8) {
-            Image(item.imageName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: cardWidth, height: cardHeight * 0.8) // 80% of height for image
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white, lineWidth: isActive ? 3 : 1)
-                )
-                .shadow(radius: isActive ? 10 : 5)
-            
-            VStack(spacing: 4) {
-                Text(item.title)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(isActive ? .primary : .secondary)
-                Text(item.subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            .frame(width: cardWidth)
-        }
+        Image(item.imageName)
+            .resizable()
+            .scaledToFill()
+            .frame(width: cardWidth, height: cardHeight * 0.7) // Use full cardWidth since it's already the image width
+            .clipped()
+            .clipShape(getCornerRadius())
+            .overlay(
+                VStack(alignment: .leading, spacing: 2) {
+                    Spacer()
+                    Spacer()
+                    Text(item.title)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .shadow(radius: 2)
+                        .lineLimit(1)
+                        .padding(.leading, 8)
+                    Text(item.subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.purple)
+                        .cornerRadius(4)
+                        .padding(.leading, 0)
+                }
+                .padding(.bottom, 20),
+                alignment: .leading
+            )
         .frame(width: cardWidth, height: cardHeight)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isActive)
     }
+    
+    private func getCornerRadius() -> AnyShape {
+        let distance = abs(index - activeIndex)
+        
+        if distance == 0 {
+            // Center image - all corners rounded
+            return AnyShape(RoundedRectangle(cornerRadius: 16))
+        } else if distance == 1 {
+            // Side images - connected sides have 0 radius, outer sides have 16pt radius
+            if index < activeIndex {
+                // Left image - left side (connected to center) has 0 radius, right side has 16pt radius
+                return AnyShape(RoundedCorner(radius: 16, corners: [.topRight, .bottomRight]))
+            } else {
+                // Right image - right side (connected to center) has 0 radius, left side has 16pt radius
+                return AnyShape(RoundedCorner(radius: 16, corners: [.topLeft, .bottomLeft]))
+            }
+        } else {
+            // Further images - all corners rounded
+            return AnyShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
 }
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
+    }
+}
+
+

@@ -13,8 +13,3 @@ struct CarouselItem: Identifiable, Hashable {
     let title: String
     let subtitle: String
 }
-
-class CarouselState: ObservableObject {
-    @Published var activeCard: Int = 0
-    @Published var screenDrag: Float = 0.0
-}
