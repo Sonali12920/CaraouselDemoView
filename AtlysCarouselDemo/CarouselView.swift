@@ -7,225 +7,198 @@
 
 import SwiftUI
 
-struct CarouselView: View {
-    @StateObject private var viewModel = CarouselViewModel()
-    @State private var activeIndex: Int = 0
-    @State private var dragOffset: CGFloat = 0
-    @State private var currentPage: Int = 0
+// MARK: - Carousel Configuration
+struct CarouselConfiguration {
+    static let spacing: CGFloat = 0
+    static let aspectRatio: CGFloat = 1.0
+    static let centerScale: CGFloat = 1.2
+    static let sideScale: CGFloat = 0.8
+    static let sideOpacity: CGFloat = 0.6
+    static let cardPadding: CGFloat = 40
+    static let cornerRadius: CGFloat = 16
+    static let paginationDotSize: CGFloat = 8
+    static let paginationDotSpacing: CGFloat = 8
+    static let carouselHeight: CGFloat = 280
+    static let imageHeightRatio: CGFloat = 0.7
+    static let titleLeadingPadding: CGFloat = 8
+    static let subtitlePadding: CGFloat = 8
+    static let overlayBottomPadding: CGFloat = 20
+    static let overlaySpacing: CGFloat = 2
+}
+
+// MARK: - Carousel State Management
+class CarouselState: ObservableObject {
+    @Published var activeIndex: Int = 0
+    @Published var dragOffset: CGFloat = 0
+    @Published var currentPage: Int = 0
     
-    // Layout constants
-    private let spacing: CGFloat = 0
-    private let cardAspectRatio: CGFloat = 1.0
-    private let centerCardScale: CGFloat = 1.2
-    private let sideCardScale: CGFloat = 0.8
-    private let sideCardOpacity: CGFloat = 0.6
-    private let cardPadding: CGFloat = 40 // Space on sides when card is centered
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            GeometryReader { geometry in
-                let cardWidth = geometry.size.width - (cardPadding * 2)
-                let cardHeight = cardWidth * cardAspectRatio
-                let imageWidth = cardWidth * 0.9
-                let totalCardWidth = imageWidth
-                
-                ZStack {
-                    // Background for visible area
-                    Color.clear
-                        .frame(width: geometry.size.width, height: cardHeight)
-                    
-                                    // Carousel items
-                HStack(spacing: 0) {
-                    ForEach(0..<viewModel.items.count, id: \.self) { index in
-                        let item = viewModel.items[index]
-                        
-                        CarouselItemView(
-                            item: item,
-                            isActive: isItemActive(index: index),
-                            cardWidth: imageWidth,
-                            cardHeight: cardHeight,
-                            index: index,
-                            activeIndex: activeIndex
-                        )
-                        .scaleEffect(getScaleForIndex(index: index))
-                        .opacity(getOpacityForIndex(index: index))
-                    }
-                }
-                    .offset(x: calculateOffset(geometry: geometry, totalCardWidth: totalCardWidth))
-                    .frame(width: geometry.size.width, alignment: .leading)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                dragOffset = value.translation.width
-                            }
-                            .onEnded { value in
-                                handleDragEnd(value: value, cardWidth: cardWidth, totalCardWidth: totalCardWidth)
-                            }
-                    )
-                }
-                .frame(height: cardHeight)
-            }
-            .frame(height: 280)
-            
-            // Pagination dots
-            HStack(spacing: 8) {
-                ForEach(0..<viewModel.items.count, id: \.self) { index in
-                    Circle()
-                        .fill(currentPage == index ? Color.purple : Color.gray.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(currentPage == index ? 1.2 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                navigateToPage(index)
-                            }
-                        }
-                }
-            }
-        }
-        .padding(.horizontal, 8)
-        .onAppear {
-            activeIndex = 0
-            currentPage = 0
-        }
-    }
-    
-    private func isItemActive(index: Int) -> Bool {
-        return index == activeIndex
-    }
-    
-    private func getScaleForIndex(index: Int) -> CGFloat {
-        let distance = abs(index - activeIndex)
-        if distance == 0 {
-            return centerCardScale
-        } else if distance == 1 {
-            return sideCardScale
-        } else {
-            return sideCardScale * 0.9
-        }
-    }
-    
-    private func getOpacityForIndex(index: Int) -> CGFloat {
-        let distance = abs(index - activeIndex)
-        if distance == 0 {
-            return 1.0
-        } else if distance == 1 {
-            return sideCardOpacity
-        } else {
-            return sideCardOpacity * 0.5
-        }
-    }
-    
-    private func calculateOffset(geometry: GeometryProxy, totalCardWidth: CGFloat) -> CGFloat {
-        let centerOffset = CGFloat(activeIndex) * -totalCardWidth
-        let screenCenter = geometry.size.width / 2
-        let imageCenter = totalCardWidth / 2
-        let adjustment = screenCenter - imageCenter
-        return centerOffset + adjustment + dragOffset
-    }
-    
-    private func handleDragEnd(value: DragGesture.Value, cardWidth: CGFloat, totalCardWidth: CGFloat) {
-        let dragThreshold = cardWidth / 3
-        let predictedEnd = value.predictedEndTranslation.width
-        
-        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8)) {
-            if value.translation.width < -dragThreshold || predictedEnd < -cardWidth {
-                activeIndex = min(activeIndex + 1, viewModel.items.count - 1)
-            } else if value.translation.width > dragThreshold || predictedEnd > cardWidth {
-                activeIndex = max(activeIndex - 1, 0)
-            }
-            dragOffset = 0
-        }
-        
-        // Update current page
-        updateCurrentPage()
-        impactFeedback(style: .light)
-    }
-    
-    private func navigateToPage(_ page: Int) {
-        activeIndex = page
-        currentPage = page
-        impactFeedback(style: .light)
-    }
-    
-    private func updateCurrentPage() {
+    func updatePage() {
         currentPage = activeIndex
     }
     
-    private func impactFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        let generator = UIImpactFeedbackGenerator(style: style)
+    func navigateToPage(_ page: Int) {
+        activeIndex = page
+        currentPage = page
+    }
+}
+
+// MARK: - Main Carousel View
+struct CarouselView: View {
+    @StateObject private var viewModel = CarouselViewModel()
+    @StateObject private var carouselState = CarouselState()
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            carouselContent
+            paginationIndicator
+        }
+        .padding(.horizontal, 8)
+        .onAppear(perform: setupInitialState)
+    }
+    
+    // MARK: - Carousel Content
+    private var carouselContent: some View {
+        GeometryReader { geometry in
+            let layout = CarouselLayout(geometry: geometry)
+            
+            ZStack {
+                backgroundView(layout: layout)
+                carouselItems(layout: layout)
+            }
+            .frame(height: layout.cardHeight)
+        }
+        .frame(height: CarouselConfiguration.carouselHeight)
+    }
+    
+    private func backgroundView(layout: CarouselLayout) -> some View {
+        Color.clear
+            .frame(width: layout.screenWidth, height: layout.cardHeight)
+    }
+    
+    private func carouselItems(layout: CarouselLayout) -> some View {
+        HStack(spacing: CarouselConfiguration.spacing) {
+            ForEach(Array(viewModel.items.enumerated()), id: \.offset) { index, item in
+                CarouselItemView(
+                    item: item,
+                    index: index,
+                    activeIndex: carouselState.activeIndex,
+                    layout: layout
+                )
+                .scaleEffect(getScale(for: index))
+                .opacity(getOpacity(for: index))
+            }
+        }
+        .offset(x: calculateOffset(layout: layout))
+        .frame(width: layout.screenWidth, alignment: .leading)
+        .gesture(createDragGesture(layout: layout))
+    }
+    
+    // MARK: - Pagination Indicator
+    private var paginationIndicator: some View {
+        HStack(spacing: CarouselConfiguration.paginationDotSpacing) {
+            ForEach(0..<viewModel.items.count, id: \.self) { index in
+                PaginationDot(
+                    isActive: carouselState.currentPage == index,
+                    onTap: { navigateToPage(index) }
+                )
+            }
+        }
+    }
+    
+    // MARK: - Layout Calculations
+    private func getScale(for index: Int) -> CGFloat {
+        let distance = abs(index - carouselState.activeIndex)
+        switch distance {
+        case 0: return CarouselConfiguration.centerScale
+        case 1: return CarouselConfiguration.sideScale
+        default: return CarouselConfiguration.sideScale * 0.9
+        }
+    }
+    
+    private func getOpacity(for index: Int) -> CGFloat {
+        let distance = abs(index - carouselState.activeIndex)
+        switch distance {
+        case 0: return 1.0
+        case 1: return CarouselConfiguration.sideOpacity
+        default: return CarouselConfiguration.sideOpacity * 0.5
+        }
+    }
+    
+    private func calculateOffset(layout: CarouselLayout) -> CGFloat {
+        let centerOffset = CGFloat(carouselState.activeIndex) * -layout.totalCardWidth
+        let screenCenter = layout.screenWidth / 2
+        let imageCenter = layout.totalCardWidth / 2
+        let adjustment = screenCenter - imageCenter
+        return centerOffset + adjustment + carouselState.dragOffset
+    }
+    
+    // MARK: - Gesture Handling
+    private func createDragGesture(layout: CarouselLayout) -> some Gesture {
+        DragGesture()
+            .onChanged { value in
+                carouselState.dragOffset = value.translation.width
+            }
+            .onEnded { value in
+                handleDragEnd(value: value, layout: layout)
+            }
+    }
+    
+    private func handleDragEnd(value: DragGesture.Value, layout: CarouselLayout) {
+        let dragThreshold = layout.cardWidth / 3
+        let predictedEnd = value.predictedEndTranslation.width
+        
+        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8)) {
+            if value.translation.width < -dragThreshold || predictedEnd < -layout.cardWidth {
+                carouselState.activeIndex = min(carouselState.activeIndex + 1, viewModel.items.count - 1)
+            } else if value.translation.width > dragThreshold || predictedEnd > layout.cardWidth {
+                carouselState.activeIndex = max(carouselState.activeIndex - 1, 0)
+            }
+            carouselState.dragOffset = 0
+        }
+        
+        carouselState.updatePage()
+        provideHapticFeedback()
+    }
+    
+    private func navigateToPage(_ page: Int) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            carouselState.navigateToPage(page)
+        }
+        provideHapticFeedback()
+    }
+    
+    // MARK: - Setup
+    private func setupInitialState() {
+        carouselState.activeIndex = 0
+        carouselState.currentPage = 0
+    }
+    
+    private func provideHapticFeedback() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
     }
 }
 
-struct CarouselItemView: View {
-    let item: CarouselItem
+// MARK: - Pagination Dot
+struct PaginationDot: View {
     let isActive: Bool
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
-    let index: Int
-    let activeIndex: Int
+    let onTap: () -> Void
     
     var body: some View {
-        Image(item.imageName)
-            .resizable()
-            .scaledToFill()
-            .frame(width: cardWidth, height: cardHeight * 0.7) // Use full cardWidth since it's already the image width
-            .clipped()
-            .clipShape(getCornerRadius())
-            .overlay(
-                VStack(alignment: .leading, spacing: 2) {
-                    Spacer()
-                    Spacer()
-                    Text(item.title)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .shadow(radius: 2)
-                        .lineLimit(1)
-                        .padding(.leading, 8)
-                    Text(item.subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.purple)
-                        .cornerRadius(4)
-                        .padding(.leading, 0)
-                }
-                .padding(.bottom, 20),
-                alignment: .leading
-            )
-        .frame(width: cardWidth, height: cardHeight)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isActive)
-    }
-    
-    private func getCornerRadius() -> AnyShape {
-        let distance = abs(index - activeIndex)
-        
-        if distance == 0 {
-            // Center image - all corners rounded
-            return AnyShape(RoundedRectangle(cornerRadius: 16))
-        } else if distance == 1 {
-            // Side images - connected sides have 0 radius, outer sides have 16pt radius
-            if index < activeIndex {
-                // Left image - left side (connected to center) has 0 radius, right side has 16pt radius
-                return AnyShape(RoundedCorner(radius: 16, corners: [.topRight, .bottomRight]))
-            } else {
-                // Right image - right side (connected to center) has 0 radius, left side has 16pt radius
-                return AnyShape(RoundedCorner(radius: 16, corners: [.topLeft, .bottomLeft]))
-            }
-        } else {
-            // Further images - all corners rounded
-            return AnyShape(RoundedRectangle(cornerRadius: 16))
-        }
+        Circle()
+            .fill(isActive ? Color.purple : Color.gray.opacity(0.3))
+            .frame(width: CarouselConfiguration.paginationDotSize, height: CarouselConfiguration.paginationDotSize)
+            .scaleEffect(isActive ? 1.2 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
+            .onTapGesture(perform: onTap)
     }
 }
 
+// MARK: - Rounded Corner Shape
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
-
+    
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
         return Path(path.cgPath)

@@ -1,3 +1,10 @@
+//
+//  ContentView.swift
+//  AtlysCarouselDemo
+//
+//  Created by Sonali on 11/07/25.
+//
+
 import SwiftUI
 
 struct ContentView: View {
