@@ -94,3 +94,8 @@ For detailed implementation documentation, architecture decisions, and technical
 ---
 
 Built with ❤️ using SwiftUI
+
+
+SS:- 
+<img width="503" height="954" alt="Screenshot 2025-07-12 at 9 20 02 PM" src="https://github.com/user-attachments/assets/be739936-22e1-4241-be19-cbd311ce57cf" />
+
